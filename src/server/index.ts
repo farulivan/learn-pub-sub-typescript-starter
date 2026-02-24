@@ -1,7 +1,8 @@
 import amqp from "amqplib";
 import { publishJSON } from '../internal/pubsub/publishJSON.js';
-import { ExchangePerilDirect, PauseKey } from '../internal/routing/routing.js';
+import { ExchangePerilDirect, ExchangePerilTopic, GameLogSlug, PauseKey } from '../internal/routing/routing.js';
 import { getInput, printServerHelp } from '../internal/gamelogic/gamelogic.js';
+import { declareAndBind, SimpleQueueType } from '../internal/pubsub/declareAndBind.js';
 
 async function main() {
   const rabbitConnString = "amqp://guest:guest@localhost:5672/";
@@ -23,13 +24,13 @@ async function main() {
 
   const publishCh = await conn.createConfirmChannel();
 
-  try {
-    await publishJSON(publishCh, ExchangePerilDirect, PauseKey, {
-      isPaused: true,
-    });
-  } catch (err) {
-    console.error("Error publishing message:", err);
-  }
+  await declareAndBind(
+    conn,
+    ExchangePerilTopic,
+    GameLogSlug,
+    `${GameLogSlug}.*`,
+    SimpleQueueType.Durable,
+  );
 
   printServerHelp();
 
