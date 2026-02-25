@@ -36,9 +36,9 @@ export function handlerMove(gs: GameState, publishCh: ConfirmChannel): (move: Ar
               `${WarRecognitionsPrefix}.${gs.getUsername()}`,
               rw,
             );
+            return AckType.Ack;
           } catch (err) {
             console.error("Error publishing war recognition:", err);
-          } finally {
             return AckType.NackRequeue;
           }
         }
