@@ -19,6 +19,9 @@ export async function declareAndBind(
     durable: queueType === SimpleQueueType.Durable && true,
     autoDelete: queueType === SimpleQueueType.Transient && true,
     exclusive: queueType === SimpleQueueType.Transient && true,
+    arguments: {
+      'x-dead-letter-exchange': 'peril_dlx'
+    },
   })
   await channel.bindQueue(q.queue, exchange, key);
 
