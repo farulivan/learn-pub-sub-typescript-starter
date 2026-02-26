@@ -1,5 +1,5 @@
 import amqp from "amqplib";
-import { publishJSON } from '../internal/pubsub/publishJSON.js';
+import { publishJSON } from '../internal/pubsub/publish.js';
 import { ExchangePerilDirect, ExchangePerilTopic, GameLogSlug, PauseKey } from '../internal/routing/routing.js';
 import { getInput, printServerHelp } from '../internal/gamelogic/gamelogic.js';
 import { declareAndBind, SimpleQueueType } from '../internal/pubsub/declareAndBind.js';
