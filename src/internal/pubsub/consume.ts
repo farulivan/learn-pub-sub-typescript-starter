@@ -1,10 +1,36 @@
 import amqp from "amqplib";
-import { declareAndBind, type SimpleQueueType } from './declareAndBind.js';
+import { type Channel } from "amqplib";
 
 export enum AckType {
   Ack = "Ack",
   NackRequeue = "NackRequeue",
   NackDiscard = "NackDiscard",
+}
+
+export enum SimpleQueueType {
+  Durable,
+  Transient,
+}
+
+export async function declareAndBind(
+  conn: amqp.ChannelModel,
+  exchange: string,
+  queueName: string,
+  key: string,
+  queueType: SimpleQueueType,
+): Promise<[Channel, amqp.Replies.AssertQueue]> {
+  const channel = await conn.createChannel();
+  const q = await channel.assertQueue(queueName, {
+    durable: queueType === SimpleQueueType.Durable && true,
+    autoDelete: queueType === SimpleQueueType.Transient && true,
+    exclusive: queueType === SimpleQueueType.Transient && true,
+    arguments: {
+      'x-dead-letter-exchange': 'peril_dlx'
+    },
+  })
+  await channel.bindQueue(q.queue, exchange, key);
+
+  return [channel, q]
 }
 
 export async function subscribeJSON<T>(
@@ -33,15 +59,12 @@ export async function subscribeJSON<T>(
       switch (result) {
         case AckType.Ack:
           channel.ack(msg);
-          console.log("Ack");
           break;
         case AckType.NackDiscard:
           channel.nack(msg, false, false);
-          console.log("NackDiscard");
           break;
         case AckType.NackRequeue:
           channel.nack(msg, false, true);
-          console.log("NackRequeue");
           break;
         default:
           const unreachable: never = result;

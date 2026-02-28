@@ -5,8 +5,9 @@ import { handleMove, MoveOutcome } from '../internal/gamelogic/move.js';
 import { handlePause } from '../internal/gamelogic/pause.js';
 import { handleWar, WarOutcome } from '../internal/gamelogic/war.js';
 import { publishJSON } from '../internal/pubsub/publish.js';
-import { AckType } from '../internal/pubsub/subscribeJSON.js';
+import { AckType } from '../internal/pubsub/consume.js';
 import { ExchangePerilTopic, WarRecognitionsPrefix } from '../internal/routing/routing.js';
+import { publishGameLog } from './index.js';
 
 export function handlerPause(gs: GameState): (ps: PlayingState) => AckType {
   return (ps: PlayingState): AckType => {
@@ -51,7 +52,7 @@ export function handlerMove(gs: GameState, publishCh: ConfirmChannel): (move: Ar
   };
 }
 
-export function handlerWar(gs: GameState): (rw: RecognitionOfWar) => Promise<AckType> {
+export function handlerWar(gs: GameState, publishCh: ConfirmChannel): (rw: RecognitionOfWar) => Promise<AckType> {
   return async (rw: RecognitionOfWar): Promise<AckType> => {
     try {
       const outcome = handleWar(gs, rw);
@@ -60,9 +61,41 @@ export function handlerWar(gs: GameState): (rw: RecognitionOfWar) => Promise<Ack
           return AckType.NackRequeue;
         case WarOutcome.NoUnits:
           return AckType.NackDiscard;
-        case WarOutcome.OpponentWon:
         case WarOutcome.YouWon:
+          try {
+            await publishGameLog(
+              publishCh,
+              gs.getUsername(),
+              `${outcome.winner} won the war against ${outcome.loser}.`,
+            );
+          } catch (err) {
+            console.error("Error publishing game log:", err);
+            return AckType.NackRequeue;
+          }
+          return AckType.Ack;
+        case WarOutcome.OpponentWon:
+          try {
+            await publishGameLog(
+              publishCh,
+              gs.getUsername(),
+              `${outcome.winner} won the war against ${outcome.loser}.`,
+            );
+          } catch (err) {
+            console.error("Error publishing game log:", err);
+            return AckType.NackRequeue;
+          }
+          return AckType.Ack;
         case WarOutcome.Draw:
+          try {
+            await publishGameLog(
+              publishCh,
+              gs.getUsername(),
+              `A war between ${outcome.attacker} and ${outcome.defender} resulted in a draw.`,
+            );
+          } catch (err) {
+            console.error("Error publishing game log:", err);
+            return AckType.NackRequeue;
+          }
           return AckType.Ack;
         default:
           const unreachable: never = outcome;
