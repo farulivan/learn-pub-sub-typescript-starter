@@ -1,5 +1,6 @@
 import amqp from "amqplib";
 import { type Channel } from "amqplib";
+import { decode } from "@msgpack/msgpack";
 
 export enum AckType {
   Ack = "Ack",
@@ -33,22 +34,23 @@ export async function declareAndBind(
   return [channel, q]
 }
 
-export async function subscribeJSON<T>(
+export async function subscribe<T>(
   conn: amqp.ChannelModel,
   exchange: string,
   queueName: string,
-  key: string,
-  queueType: SimpleQueueType, // an enum to represent "durable" or "transient"
+  routingKey: string,
+  simpleQueueType: SimpleQueueType,
   handler: (data: T) => Promise<AckType> | AckType,
+  unmarshaller: (data: Buffer) => T,
 ): Promise<void> {
-  const [ channel, queueInfo ] = await declareAndBind(conn, exchange, queueName, key, queueType);
+  const [channel, queueInfo] = await declareAndBind(conn, exchange, queueName, routingKey, simpleQueueType);
   await channel.consume(queueInfo.queue, async (msg: amqp.ConsumeMessage | null) => {
     if (msg === null) {
       return;
     }
     let data: T;
     try {
-      data = JSON.parse(msg.content.toString());
+      data = unmarshaller(msg.content);
     } catch (err) {
       console.error("Could not unmarshal message:", err);
       return;
@@ -77,4 +79,42 @@ export async function subscribeJSON<T>(
       return;
     }
   });
+}
+
+export async function subscribeJSON<T>(
+  conn: amqp.ChannelModel,
+  exchange: string,
+  queueName: string,
+  key: string,
+  queueType: SimpleQueueType,
+  handler: (data: T) => Promise<AckType> | AckType,
+): Promise<void> {
+  return subscribe<T>(
+    conn,
+    exchange,
+    queueName,
+    key,
+    queueType,
+    handler,
+    (data: Buffer) => JSON.parse(data.toString()) as T,
+  );
+}
+
+export async function subscribeMsgPack<T>(
+  conn: amqp.ChannelModel,
+  exchange: string,
+  queueName: string,
+  key: string,
+  queueType: SimpleQueueType,
+  handler: (data: T) => Promise<AckType> | AckType,
+): Promise<void> {
+  return subscribe<T>(
+    conn,
+    exchange,
+    queueName,
+    key,
+    queueType,
+    handler,
+    (data: Buffer) => decode(data) as T,
+  );
 }
