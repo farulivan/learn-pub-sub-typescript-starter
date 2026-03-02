@@ -1,5 +1,5 @@
 import amqp from 'amqplib';
-import { clientWelcome, commandStatus, getInput, printClientHelp, printQuit } from '../internal/gamelogic/gamelogic.js';
+import { clientWelcome, commandStatus, getInput, getMaliciousLog, printClientHelp, printQuit } from '../internal/gamelogic/gamelogic.js';
 import { SimpleQueueType } from '../internal/pubsub/consume.js';
 import {
   ArmyMovesPrefix,
@@ -121,7 +121,34 @@ async function main() {
       printQuit();
       process.exit(0);
     } else if (command === "spam") {
-      console.log("Spamming not allowed yet!");
+      if (words.length < 2) {
+        console.log("Usage: spam <count>");
+        continue;
+      }
+      const count = parseInt(words[1]!, 10);
+      if (isNaN(count)) {
+        console.log("Error: count must be a valid integer");
+        continue;
+      }
+      try {
+        for (let i = 0; i < count; i++) {
+          const logMessage = getMaliciousLog();
+          const gameLog: GameLog = {
+            currentTime: new Date(),
+            message: logMessage,
+            username: username,
+          };
+          await publishMsgPack(
+            publishCh,
+            ExchangePerilTopic,
+            `${GameLogSlug}.${username}`,
+            gameLog,
+          );
+        }
+        console.log(`Published ${count} malicious log(s)`);
+      } catch (err) {
+        console.log((err as Error).message);
+      }
     } else {
       console.log("Unknown command");
       continue;
