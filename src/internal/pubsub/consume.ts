@@ -44,7 +44,7 @@ export async function subscribe<T>(
   unmarshaller: (data: Buffer) => T,
 ): Promise<void> {
   const [channel, queueInfo] = await declareAndBind(conn, exchange, queueName, routingKey, simpleQueueType);
-  await channel.prefetch(1);
+  await channel.prefetch(10);
   await channel.consume(queueInfo.queue, async (msg: amqp.ConsumeMessage | null) => {
     if (msg === null) {
       return;
